@@ -45,11 +45,18 @@
   - Spring Data Redis
   - Distributed Cache 패턴
   - Session Clustering
+- **Go 언어** 학습 및 실전 프로젝트
+  - Go 문법 및 기본 개념 마스터
+  - Goroutines 및 동시성 프로그래밍
+  - 표준 라이브러리 활용
+  - Web Crawler 프로젝트 구현
+  - 고성능 네트워크 프로그래밍
 
 ### 프로젝트 목표
 - [ ] Spring Boot 3.x + Kotlin 마이크로서비스 구축
 - [ ] GraphQL API 서버 개발
 - [ ] Docker + Kubernetes 배포 파이프라인 구성
+- [ ] Go 언어로 Web Crawler 프로젝트 구현
 
 ---
 
