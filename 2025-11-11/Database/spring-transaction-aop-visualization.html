@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스프링 트랜잭션 AOP 동작 흐름 - 완벽 가이드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 3px solid #667eea;
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 1em;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.3s ease;
+            position: relative;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #667eea;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        h3 {
+            color: #764ba2;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+        }
+
+        .diagram {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 20px 0;
+            border: 2px solid #e9ecef;
+        }
+
+        .flow-step {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .flow-step:hover {
+            transform: translateX(10px);
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .flow-step h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: #667eea;
+            font-size: 2em;
+            margin: 10px 0;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .code-block .keyword {
+            color: #ff79c6;
+        }
+
+        .code-block .string {
+            color: #50fa7b;
+        }
+
+        .code-block .comment {
+            color: #6272a4;
+            font-style: italic;
+        }
+
+        .code-block .annotation {
+            color: #8be9fd;
+        }
+
+        .component-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .component-box:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .component-box h4 {
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .component-details {
+            display: none;
+            background: white;
+            color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 2px solid #667eea;
+        }
+
+        .component-details.active {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .comparison-table th {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 50px;
+            margin: 30px 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #667eea;
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -38px;
+            top: 20px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 3px solid white;
+            box-shadow: 0 0 0 3px #667eea;
+        }
+
+        .highlight-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .highlight-box.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+
+        .highlight-box.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .highlight-box.info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+
+        .badge.phase {
+            background: #667eea;
+            color: white;
+        }
+
+        .badge.component {
+            background: #764ba2;
+            color: white;
+        }
+
+        .badge.action {
+            background: #28a745;
+            color: white;
+        }
+
+        .interactive-diagram {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .diagram-box {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .diagram-box:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .diagram-box .icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        footer {
+            background: #2d2d2d;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            margin-top: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                border-radius: 0;
+            }
+
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                border-bottom: 1px solid #e9ecef;
+            }
+
+            .timeline {
+                padding-left: 30px;
+            }
+
+            .timeline::before {
+                left: 10px;
+            }
+
+            .timeline-item::before {
+                left: -28px;
+            }
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .process-flow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .process-step {
+            flex: 1;
+            min-width: 150px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .process-step:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .process-arrow {
+            font-size: 2em;
+            color: #667eea;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 스프링 트랜잭션 AOP 동작 흐름</h1>
+            <p>@Transactional이 실제로 어떻게 동작하는지 완벽하게 이해하기</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('overview')">📊 전체 개요</button>
+            <button class="tab" onclick="showTab('proxy-creation')">🔧 프록시 생성</button>
+            <button class="tab" onclick="showTab('runtime-flow')">⚡ 런타임 흐름</button>
+            <button class="tab" onclick="showTab('components')">🧩 핵심 컴포넌트</button>
+            <button class="tab" onclick="showTab('propagation')">🔄 전파 속성</button>
+            <button class="tab" onclick="showTab('scenarios')">✅ 성공/실패 시나리오</button>
+            <button class="tab" onclick="showTab('threadlocal')">🧵 ThreadLocal</button>
+        </div>
+
+        <div class="content">
+            <!-- Tab 1: 전체 개요 -->
+            <div id="overview" class="tab-content active">
+                <h2>📊 전체 아키텍처 개요</h2>
+                
+                <div class="highlight-box info">
+                    <strong>핵심 포인트:</strong> 스프링은 AOP 프록시를 사용하여 @Transactional 메서드를 자동으로 트랜잭션으로 감싸줍니다.
+                </div>
+
+                <h3>전체 동작 과정</h3>
+                <div class="process-flow">
+                    <div class="process-step">
+                        <strong>1단계</strong><br>
+                        애플리케이션 시작
+                    </div>
+                    <div class="process-arrow">→</div>
+                    <div class="process-step">
+                        <strong>2단계</strong><br>
+                        프록시 생성
+                    </div>
+                    <div class="process-arrow">→</div>
+                    <div class="process-step">
+                        <strong>3단계</strong><br>
+                        메서드 호출
+                    </div>
+                    <div class="process-arrow">→</div>
+                    <div class="process-step">
+                        <strong>4단계</strong><br>
+                        트랜잭션 처리
+                    </div>
+                </div>
+
+                <h3>핵심 컴포넌트</h3>
+                <div class="interactive-diagram">
+                    <div class="diagram-box">
+                        <div class="icon">🎯</div>
+                        <h4>@Transactional</h4>
+                        <p>트랜잭션 선언</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🔄</div>
+                        <h4>AOP Proxy</h4>
+                        <p>메서드 인터셉트</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">⚙️</div>
+                        <h4>Transaction Manager</h4>
+                        <p>트랜잭션 관리</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🧵</div>
+                        <h4>Synchronization Manager</h4>
+                        <p>Connection 동기화</p>
+                    </div>
+                </div>
+
+                <h3>레이어 구조</h3>
+                <div class="diagram">
+                    <div class="flow-step">
+                        <h4><span class="badge phase">Layer 1</span> Client (Controller)</h4>
+                        <p>비즈니스 로직 호출</p>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-step">
+                        <h4><span class="badge phase">Layer 2</span> Proxy (CGLIB/JDK Dynamic)</h4>
+                        <p>TransactionInterceptor가 메서드 인터셉트</p>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-step">
+                        <h4><span class="badge phase">Layer 3</span> Transaction Manager</h4>
+                        <p>트랜잭션 시작/커밋/롤백</p>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    <div class="flow-step">
+                        <h4><span class="badge phase">Layer 4</span> DataSource/EntityManager</h4>
+                        <p>실제 DB Connection 관리</p>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="comment">// 개발자가 작성하는 코드</span>
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> OrderService {
+    
+    <span class="annotation">@Transactional</span> <span class="comment">// 이것만 붙이면!</span>
+    <span class="keyword">public void</span> createOrder(Order order) {
+        orderRepository.save(order);
+        paymentService.processPayment(order.getId());
+    }
+}
+
+<span class="comment">// 스프링이 자동으로 처리하는 것:</span>
+<span class="comment">// 1. 프록시 생성 (애플리케이션 시작 시)</span>
+<span class="comment">// 2. 트랜잭션 시작 (메서드 호출 전)</span>
+<span class="comment">// 3. 실제 메서드 실행</span>
+<span class="comment">// 4. 트랜잭션 커밋 (성공 시) 또는 롤백 (실패 시)</span>
+                </div>
+            </div>
+
+            <!-- Tab 2: 프록시 생성 -->
+            <div id="proxy-creation" class="tab-content">
+                <h2>🔧 프록시 생성 과정 (애플리케이션 시작 시)</h2>
+
+                <div class="highlight-box">
+                    <strong>⏰ 언제?</strong> 애플리케이션 시작 시 (SpringApplication.run() 실행 중)<br>
+                    <strong>📦 무엇을?</strong> @Transactional이 붙은 클래스의 프록시 객체 생성<br>
+                    <strong>🎯 왜?</strong> 런타임에 메서드 호출을 인터셉트하기 위해
+                </div>
+
+                <h3>타임라인</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <span class="badge phase">T0</span>
+                        <h4>애플리케이션 시작</h4>
+                        <div class="code-block">SpringApplication.run(Application.<span class="keyword">class</span>, args);</div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T1</span>
+                        <h4>스프링 컨테이너 초기화</h4>
+                        <p>@ComponentScan으로 @Service, @Repository 등 스캔</p>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T2</span>
+                        <h4>빈 정의 등록</h4>
+                        <p>OrderService, PaymentService 등의 BeanDefinition 생성</p>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T3</span>
+                        <h4>원본 빈 인스턴스 생성</h4>
+                        <div class="code-block">OrderService orderService = <span class="keyword">new</span> OrderService();</div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T4</span>
+                        <h4>BeanPostProcessor 실행 ⭐</h4>
+                        <p>AbstractAutoProxyCreator가 @Transactional 감지</p>
+                        <div class="code-block">
+<span class="keyword">if</span> (hasTransactionalAnnotation(bean)) {
+    <span class="comment">// 프록시 생성!</span>
+    <span class="keyword">return</span> createProxy(bean);
+}
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T5</span>
+                        <h4>프록시 생성 (CGLIB)</h4>
+                        <div class="code-block">
+<span class="comment">// 생성된 클래스:</span>
+OrderService$$EnhancerBySpringCGLIB$$12345678
+    <span class="keyword">extends</span> OrderService {
+    <span class="keyword">private</span> OrderService target; <span class="comment">// 원본</span>
+    <span class="keyword">private</span> TransactionInterceptor interceptor;
+}
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <span class="badge phase">T6</span>
+                        <h4>프록시를 스프링 컨테이너에 등록</h4>
+                        <p>원본 대신 프록시가 빈으로 등록됨!</p>
+                        <div class="highlight-box success">
+                            <strong>✅ 완료:</strong> 이제 다른 빈들이 주입받을 때 프록시를 받게 됨
+                        </div>
+                    </div>
+                </div>
+
+                <h3>프록시 구조</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="comment">// 스프링이 생성한 프록시 (개념적 표현)</span>
+<span class="keyword">public class</span> OrderService$$CGLIB <span class="keyword">extends</span> OrderService {
+    
+    <span class="keyword">private</span> OrderService target; <span class="comment">// 원본 객체</span>
+    <span class="keyword">private</span> TransactionInterceptor interceptor;
+    
+    <span class="annotation">@Override</span>
+    <span class="keyword">public void</span> createOrder(Order order) {
+        <span class="comment">// 1. TransactionInterceptor 호출</span>
+        MethodInvocation invocation = <span class="keyword">new</span> MethodInvocation(
+            target, <span class="string">"createOrder"</span>, <span class="keyword">new</span> Object[]{order}
+        );
+        
+        <span class="comment">// 2. 트랜잭션 처리 위임</span>
+        interceptor.invoke(invocation);
+        
+        <span class="comment">// 실제 메서드는 interceptor 내부에서 호출됨</span>
+    }
+}
+                    </div>
+                </div>
+
+                <div class="component-box" onclick="toggleDetails('proxy-types')">
+                    <h4>🔍 프록시 생성 방식: JDK Dynamic vs CGLIB</h4>
+                    <p>클릭하여 상세 비교 보기</p>
+                </div>
+                <div id="proxy-types" class="component-details">
+                    <table class="comparison-table">
+                        <tr>
+                            <th>구분</th>
+                            <th>JDK Dynamic Proxy</th>
+                            <th>CGLIB Proxy (기본)</th>
+                        </tr>
+                        <tr>
+                            <td><strong>조건</strong></td>
+                            <td>인터페이스 필수</td>
+                            <td>인터페이스 불필요</td>
+                        </tr>
+                        <tr>
+                            <td><strong>방식</strong></td>
+                            <td>인터페이스 구현</td>
+                            <td>클래스 상속</td>
+                        </tr>
+                        <tr>
+                            <td><strong>성능</strong></td>
+                            <td>빠른 생성</td>
+                            <td>빠른 실행</td>
+                        </tr>
+                        <tr>
+                            <td><strong>제약</strong></td>
+                            <td>인터페이스 메서드만</td>
+                            <td>final 메서드 불가</td>
+                        </tr>
+                        <tr>
+                            <td><strong>스프링 부트</strong></td>
+                            <td>-</td>
+                            <td>✅ 기본값</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: 런타임 흐름 -->
+            <div id="runtime-flow" class="tab-content">
+                <h2>⚡ 런타임 트랜잭션 실행 흐름</h2>
+
+                <div class="highlight-box">
+                    <strong>시나리오:</strong> HTTP 요청으로 OrderService.createOrder() 메서드 호출
+                </div>
+
+                <h3>전체 호출 스택</h3>
+                <div class="diagram">
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 1</span> HTTP 요청 도착</h4>
+                        <div class="code-block">POST /orders</div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 2</span> Controller 호출</h4>
+                        <div class="code-block">
+<span class="annotation">@PostMapping</span>(<span class="string">"/orders"</span>)
+<span class="keyword">public void</span> create() {
+    orderService.createOrder(order); <span class="comment">// 프록시 호출!</span>
+}
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 3</span> Proxy 진입</h4>
+                        <p>OrderService$$CGLIB.createOrder() 호출됨</p>
+                        <div class="highlight-box info">
+                            💡 여기서부터 트랜잭션 처리 시작!
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 4</span> TransactionInterceptor.invoke()</h4>
+                        <div class="code-block">
+<span class="keyword">public</span> Object invoke(MethodInvocation invocation) {
+    <span class="comment">// @Transactional 속성 읽기</span>
+    <span class="keyword">return</span> invokeWithinTransaction(
+        method, targetClass, invocation::proceed
+    );
+}
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 5</span> Transaction Manager 호출</h4>
+                        <p>PlatformTransactionManager.getTransaction()</p>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 6</span> 트랜잭션 시작 🎬</h4>
+                        <div class="code-block">
+<span class="comment">// 1. Connection 획득</span>
+Connection conn = dataSource.getConnection();
+
+<span class="comment">// 2. 자동 커밋 끄기</span>
+conn.setAutoCommit(<span class="keyword">false</span>);
+
+<span class="comment">// 3. ThreadLocal에 저장</span>
+TransactionSynchronizationManager.bindResource(
+    dataSource, <span class="keyword">new</span> ConnectionHolder(conn)
+);
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 7</span> 실제 메서드 실행 🚀</h4>
+                        <div class="code-block">
+<span class="comment">// 원본 OrderService.createOrder() 실행</span>
+orderRepository.save(order);
+paymentService.processPayment(order.getId());
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 8</span> Repository에서 Connection 사용</h4>
+                        <div class="code-block">
+<span class="comment">// ThreadLocal에서 같은 Connection 가져옴!</span>
+Connection conn = TransactionSynchronizationManager
+    .getResource(dataSource);
+
+<span class="comment">// SQL 실행 (아직 커밋 안됨)</span>
+conn.prepareStatement(<span class="string">"INSERT INTO orders..."</span>)
+    .executeUpdate();
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 9</span> 중첩 트랜잭션 (REQUIRED)</h4>
+                        <div class="code-block">
+<span class="comment">// PaymentService도 @Transactional</span>
+<span class="comment">// → 기존 트랜잭션에 참여 (새로 만들지 않음)</span>
+paymentService.processPayment(orderId);
+                        </div>
+                        <div class="highlight-box">
+                            <strong>중요:</strong> 같은 Connection, 같은 트랜잭션 사용!
+                        </div>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 10</span> 메서드 완료</h4>
+                        <p>예외 없이 정상 종료</p>
+                    </div>
+                    <div class="flow-arrow">↓</div>
+                    
+                    <div class="flow-step">
+                        <h4><span class="badge action">Step 11</span> 트랜잭션 커밋 ✅</h4>
+                        <div class="code-block">
+<span class="comment">// 1. DB에 커밋</span>
+conn.commit();
+
+<span class="comment">// 2. ThreadLocal 정리</span>
+TransactionSynchronizationManager.unbindResource(dataSource);
+
+<span class="comment">// 3. Connection 반환 (커넥션 풀로)</span>
+conn.close();
+                        </div>
+                    </div>
+                </div>
+
+                <h3>스레드별 실행 상태</h3>
+                <div class="diagram">
+                    <div class="code-block">
+Thread: http-nio-8080-exec-1
+    │
+    ├─ ThreadLocal&lt;Connection&gt;
+    │   └─ HikariProxyConnection@abc123
+    │       ├─ autoCommit: <span class="keyword">false</span>
+    │       ├─ isolation: READ_COMMITTED
+    │       └─ status: ACTIVE
+    │
+    ├─ TransactionStatus
+    │   ├─ newTransaction: <span class="keyword">true</span>
+    │   ├─ readOnly: <span class="keyword">false</span>
+    │   └─ completed: <span class="keyword">false</span>
+    │
+    └─ 실행 중인 메서드
+        ├─ OrderService.createOrder()
+        │   ├─ orderRepository.save() ✅
+        │   └─ PaymentService.processPayment()
+        │       └─ paymentRepository.save() ✅
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: 핵심 컴포넌트 -->
+            <div id="components" class="tab-content">
+                <h2>🧩 핵심 컴포넌트 상세</h2>
+
+                <div class="component-box" onclick="toggleDetails('comp-interceptor')">
+                    <h4>1️⃣ TransactionInterceptor</h4>
+                    <p>메서드 호출을 인터셉트하고 트랜잭션 로직 적용</p>
+                </div>
+                <div id="comp-interceptor" class="component-details">
+                    <h4>역할</h4>
+                    <ul>
+                        <li>@Transactional 속성 파싱</li>
+                        <li>TransactionManager에게 트랜잭션 시작 요청</li>
+                        <li>실제 메서드 실행</li>
+                        <li>성공 시 커밋, 실패 시 롤백</li>
+                    </ul>
+                    <div class="code-block">
+<span class="keyword">public class</span> TransactionInterceptor {
+    
+    <span class="keyword">public</span> Object invoke(MethodInvocation invocation) {
+        <span class="comment">// 1. @Transactional 속성 읽기</span>
+        TransactionAttribute txAttr = getTransactionAttribute();
+        
+        <span class="comment">// 2. Transaction Manager 찾기</span>
+        PlatformTransactionManager tm = determineTransactionManager();
+        
+        <span class="comment">// 3. 트랜잭션 내에서 실행</span>
+        <span class="keyword">try</span> {
+            TransactionStatus status = tm.getTransaction(txAttr);
+            Object result = invocation.proceed(); <span class="comment">// 실제 메서드</span>
+            tm.commit(status);
+            <span class="keyword">return</span> result;
+        } <span class="keyword">catch</span> (Exception e) {
+            tm.rollback(status);
+            <span class="keyword">throw</span> e;
+        }
+    }
+}
+                    </div>
+                </div>
+
+                <div class="component-box" onclick="toggleDetails('comp-manager')">
+                    <h4>2️⃣ PlatformTransactionManager</h4>
+                    <p>트랜잭션을 실제로 시작/커밋/롤백하는 매니저</p>
+                </div>
+                <div id="comp-manager" class="component-details">
+                    <h4>구현체</h4>
+                    <table class="comparison-table">
+                        <tr>
+                            <th>구현체</th>
+                            <th>사용 기술</th>
+                            <th>관리 대상</th>
+                        </tr>
+                        <tr>
+                            <td><strong>DataSourceTransactionManager</strong></td>
+                            <td>JDBC, MyBatis</td>
+                            <td>Connection</td>
+                        </tr>
+                        <tr>
+                            <td><strong>JpaTransactionManager</strong></td>
+                            <td>JPA, Hibernate</td>
+                            <td>EntityManager</td>
+                        </tr>
+                        <tr>
+                            <td><strong>JtaTransactionManager</strong></td>
+                            <td>분산 트랜잭션</td>
+                            <td>XA Resource</td>
+                        </tr>
+                    </table>
+
+                    <h4>핵심 메서드</h4>
+                    <div class="code-block">
+<span class="keyword">public interface</span> PlatformTransactionManager {
+    
+    <span class="comment">// 트랜잭션 시작 (또는 기존 트랜잭션 참여)</span>
+    TransactionStatus getTransaction(TransactionDefinition def);
+    
+    <span class="comment">// 트랜잭션 커밋</span>
+    <span class="keyword">void</span> commit(TransactionStatus status);
+    
+    <span class="comment">// 트랜잭션 롤백</span>
+    <span class="keyword">void</span> rollback(TransactionStatus status);
+}
+                    </div>
+                </div>
+
+                <div class="component-box" onclick="toggleDetails('comp-sync')">
+                    <h4>3️⃣ TransactionSynchronizationManager</h4>
+                    <p>ThreadLocal 기반 트랜잭션 리소스 동기화</p>
+                </div>
+                <div id="comp-sync" class="component-details">
+                    <h4>역할</h4>
+                    <ul>
+                        <li>현재 스레드의 Connection을 ThreadLocal에 저장</li>
+                        <li>같은 스레드 내 모든 코드가 같은 Connection 공유</li>
+                        <li>트랜잭션 정보 저장 (readOnly, isolation 등)</li>
+                    </ul>
+
+                    <div class="code-block">
+<span class="keyword">public abstract class</span> TransactionSynchronizationManager {
+    
+    <span class="comment">// ThreadLocal 변수</span>
+    <span class="keyword">private static final</span> ThreadLocal&lt;Map&lt;Object, Object&gt;&gt; 
+        resources = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="comment">// Connection 저장</span>
+    <span class="keyword">public static void</span> bindResource(
+        Object key, Object value) {
+        
+        Map&lt;Object, Object&gt; map = resources.get();
+        <span class="keyword">if</span> (map == <span class="keyword">null</span>) {
+            map = <span class="keyword">new</span> HashMap&lt;&gt;();
+            resources.set(map);
+        }
+        map.put(key, value); <span class="comment">// DataSource → Connection</span>
+    }
+    
+    <span class="comment">// Connection 가져오기</span>
+    <span class="keyword">public static</span> Object getResource(Object key) {
+        Map&lt;Object, Object&gt; map = resources.get();
+        <span class="keyword">return</span> map != <span class="keyword">null</span> ? map.get(key) : <span class="keyword">null</span>;
+    }
+}
+                    </div>
+
+                    <div class="highlight-box">
+                        <strong>왜 ThreadLocal?</strong><br>
+                        • 스레드마다 독립적인 Connection 보장<br>
+                        • Connection을 파라미터로 전달할 필요 없음<br>
+                        • 같은 트랜잭션 내 모든 Repository가 같은 Connection 사용
+                    </div>
+                </div>
+
+                <div class="component-box" onclick="toggleDetails('comp-status')">
+                    <h4>4️⃣ TransactionStatus</h4>
+                    <p>현재 트랜잭션의 상태 정보</p>
+                </div>
+                <div id="comp-status" class="component-details">
+                    <h4>주요 정보</h4>
+                    <div class="code-block">
+<span class="keyword">public interface</span> TransactionStatus {
+    
+    <span class="comment">// 새로운 트랜잭션인가? (vs 기존 트랜잭션 참여)</span>
+    <span class="keyword">boolean</span> isNewTransaction();
+    
+    <span class="comment">// 롤백 전용으로 설정되었는가?</span>
+    <span class="keyword">boolean</span> isRollbackOnly();
+    
+    <span class="comment">// 트랜잭션이 완료되었는가?</span>
+    <span class="keyword">boolean</span> isCompleted();
+    
+    <span class="comment">// 세이브포인트가 있는가?</span>
+    <span class="keyword">boolean</span> hasSavepoint();
+}
+                    </div>
+
+                    <p><strong>사용 예:</strong> REQUIRED 전파 속성에서 기존 트랜잭션 참여 시 isNewTransaction()은 false를 반환하여, 커밋/롤백을 하지 않고 외부 트랜잭션에 위임합니다.</p>
+                </div>
+            </div>
+
+            <!-- Tab 5: 전파 속성 -->
+            <div id="propagation" class="tab-content">
+                <h2>🔄 트랜잭션 전파 속성 (Propagation)</h2>
+
+                <div class="highlight-box">
+                    <strong>전파 속성이란?</strong> 트랜잭션 메서드가 다른 트랜잭션 메서드를 호출할 때, 트랜잭션을 어떻게 처리할지 결정하는 설정
+                </div>
+
+                <h3>주요 전파 속성 비교</h3>
+                <table class="comparison-table">
+                    <tr>
+                        <th>속성</th>
+                        <th>기존 트랜잭션 O</th>
+                        <th>기존 트랜잭션 X</th>
+                        <th>사용 사례</th>
+                    </tr>
+                    <tr>
+                        <td><strong>REQUIRED</strong><br>(기본값)</td>
+                        <td>기존 참여</td>
+                        <td>새로 생성</td>
+                        <td>대부분의 경우</td>
+                    </tr>
+                    <tr>
+                        <td><strong>REQUIRES_NEW</strong></td>
+                        <td>새로 생성<br>(기존 중단)</td>
+                        <td>새로 생성</td>
+                        <td>독립적인 트랜잭션<br>(로그 기록 등)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SUPPORTS</strong></td>
+                        <td>기존 참여</td>
+                        <td>트랜잭션 없이 실행</td>
+                        <td>읽기 전용 메서드</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MANDATORY</strong></td>
+                        <td>기존 참여</td>
+                        <td>예외 발생</td>
+                        <td>반드시 트랜잭션 필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NOT_SUPPORTED</strong></td>
+                        <td>트랜잭션 중단</td>
+                        <td>트랜잭션 없이 실행</td>
+                        <td>트랜잭션 불필요</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NEVER</strong></td>
+                        <td>예외 발생</td>
+                        <td>트랜잭션 없이 실행</td>
+                        <td>트랜잭션 금지</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NESTED</strong></td>
+                        <td>중첩 트랜잭션</td>
+                        <td>새로 생성</td>
+                        <td>부분 롤백 필요</td>
+                    </tr>
+                </table>
+
+                <h3>1. REQUIRED (가장 많이 사용) ⭐</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> OrderService {
+    
+    <span class="annotation">@Transactional</span> <span class="comment">// REQUIRED (기본값)</span>
+    <span class="keyword">public void</span> createOrder(Order order) {
+        <span class="comment">// 트랜잭션 A 시작</span>
+        orderRepository.save(order);
+        
+        <span class="comment">// PaymentService도 REQUIRED</span>
+        <span class="comment">// → 트랜잭션 A에 참여 (새로 만들지 않음)</span>
+        paymentService.processPayment(order.getId());
+        
+        <span class="comment">// 둘 다 같은 트랜잭션</span>
+        <span class="comment">// 하나라도 실패하면 전체 롤백!</span>
+    }
+}
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> PaymentService {
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> processPayment(Long orderId) {
+        paymentRepository.save(payment);
+    }
+}
+                    </div>
+
+                    <div class="flow-step">
+                        <h4>실행 흐름</h4>
+                        <div class="highlight-box success">
+                            ✅ createOrder() → 트랜잭션 A 시작<br>
+                            ✅ orderRepository.save() → 트랜잭션 A 사용<br>
+                            ✅ processPayment() → 트랜잭션 A 참여 (새로 만들지 않음)<br>
+                            ✅ paymentRepository.save() → 트랜잭션 A 사용<br>
+                            ✅ 메서드 완료 → 트랜잭션 A 커밋
+                        </div>
+                    </div>
+                </div>
+
+                <h3>2. REQUIRES_NEW (독립 트랜잭션)</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> OrderService {
+    
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> createOrder(Order order) {
+        <span class="comment">// 트랜잭션 A</span>
+        orderRepository.save(order);
+        
+        <span class="comment">// 로그는 별도 트랜잭션으로 (항상 커밋)</span>
+        logService.log(<span class="string">"주문 생성"</span>);
+        
+        <span class="comment">// 예외 발생 → 주문은 롤백, 로그는 커밋!</span>
+        <span class="keyword">throw new</span> RuntimeException(<span class="string">"주문 실패"</span>);
+    }
+}
+
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> LogService {
+    
+    <span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRES_NEW)
+    <span class="keyword">public void</span> log(String message) {
+        <span class="comment">// 트랜잭션 B (독립적!)</span>
+        logRepository.save(log);
+    }
+}
+                    </div>
+
+                    <div class="flow-step">
+                        <h4>실행 흐름</h4>
+                        <div class="highlight-box info">
+                            🔹 createOrder() → 트랜잭션 A 시작<br>
+                            🔹 orderRepository.save() → 트랜잭션 A<br>
+                            🔹 log() → 트랜잭션 B 시작 (A 중단)<br>
+                            🔹 logRepository.save() → 트랜잭션 B<br>
+                            🔹 log() 완료 → 트랜잭션 B 커밋 ✅<br>
+                            🔹 예외 발생 → 트랜잭션 A 롤백 ❌<br>
+                            <br>
+                            <strong>결과:</strong> 주문은 롤백되지만 로그는 남음!
+                        </div>
+                    </div>
+                </div>
+
+                <h3>3. SUPPORTS (트랜잭션 선택적)</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> ProductService {
+    
+    <span class="annotation">@Transactional</span>(propagation = Propagation.SUPPORTS)
+    <span class="keyword">public</span> Product findProduct(Long id) {
+        <span class="comment">// 기존 트랜잭션 있으면 참여</span>
+        <span class="comment">// 없으면 트랜잭션 없이 실행</span>
+        <span class="keyword">return</span> productRepository.findById(id);
+    }
+}
+
+<span class="comment">// Case 1: 트랜잭션 내에서 호출</span>
+<span class="annotation">@Transactional</span>
+<span class="keyword">public void</span> orderWithProduct() {
+    Product product = productService.findProduct(1L);
+    <span class="comment">// → 트랜잭션 참여</span>
+}
+
+<span class="comment">// Case 2: 트랜잭션 없이 호출</span>
+<span class="keyword">public void</span> viewProduct() {
+    Product product = productService.findProduct(1L);
+    <span class="comment">// → 트랜잭션 없이 실행 (autoCommit=true)</span>
+}
+                    </div>
+                </div>
+
+                <h3>전파 속성 선택 가이드</h3>
+                <div class="interactive-diagram">
+                    <div class="diagram-box">
+                        <div class="icon">✅</div>
+                        <h4>REQUIRED</h4>
+                        <p>일반적인 비즈니스 로직</p>
+                        <small>대부분의 경우 사용</small>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🆕</div>
+                        <h4>REQUIRES_NEW</h4>
+                        <p>독립적인 작업</p>
+                        <small>로그, 감사, 알림 등</small>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">📖</div>
+                        <h4>SUPPORTS</h4>
+                        <p>읽기 전용</p>
+                        <small>조회 메서드</small>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">⚠️</div>
+                        <h4>MANDATORY</h4>
+                        <p>트랜잭션 필수</p>
+                        <small>반드시 트랜잭션 내 호출</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 6: 시나리오 -->
+            <div id="scenarios" class="tab-content">
+                <h2>✅ 성공/실패 시나리오</h2>
+
+                <h3>시나리오 1: 정상 커밋 ✅</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Transactional</span>
+<span class="keyword">public void</span> successCase() {
+    orderRepository.save(order);        <span class="comment">// SQL 실행 (미커밋)</span>
+    paymentRepository.save(payment);    <span class="comment">// SQL 실행 (미커밋)</span>
+    
+    <span class="comment">// 메서드 정상 완료</span>
+    <span class="comment">// → commit() 자동 호출</span>
+}
+                    </div>
+
+                    <div class="highlight-box success">
+                        <strong>✅ 결과:</strong><br>
+                        1. Connection.commit() 호출<br>
+                        2. 모든 SQL이 DB에 반영됨<br>
+                        3. ThreadLocal 정리<br>
+                        4. Connection 반환 (커넥션 풀)
+                    </div>
+                </div>
+
+                <h3>시나리오 2: RuntimeException 롤백 ❌</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Transactional</span>
+<span class="keyword">public void</span> runtimeExceptionCase() {
+    orderRepository.save(order);        <span class="comment">// SQL 실행 (미커밋)</span>
+    
+    <span class="keyword">throw new</span> RuntimeException(<span class="string">"오류!"</span>); <span class="comment">// 예외 발생!</span>
+    
+    paymentRepository.save(payment);    <span class="comment">// 실행 안됨</span>
+}
+                    </div>
+
+                    <div class="highlight-box error">
+                        <strong>❌ 결과:</strong><br>
+                        1. RuntimeException 캐치<br>
+                        2. Connection.rollback() 호출<br>
+                        3. 모든 SQL 취소 (order도 저장 안됨)<br>
+                        4. ThreadLocal 정리<br>
+                        5. Connection 반환<br>
+                        6. 예외를 호출자에게 전파
+                    </div>
+                </div>
+
+                <h3>시나리오 3: Checked Exception 커밋 (기본) ⚠️</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Transactional</span> <span class="comment">// 기본 설정</span>
+<span class="keyword">public void</span> checkedExceptionCase() <span class="keyword">throws</span> Exception {
+    orderRepository.save(order);
+    
+    <span class="keyword">throw new</span> Exception(<span class="string">"체크 예외"</span>); <span class="comment">// Checked Exception</span>
+}
+                    </div>
+
+                    <div class="highlight-box">
+                        <strong>⚠️ 결과:</strong><br>
+                        기본적으로 <strong>커밋됨!</strong> (롤백 안됨)<br>
+                        → RuntimeException만 기본으로 롤백<br>
+                        <br>
+                        <strong>해결책:</strong> rollbackFor 지정
+                    </div>
+
+                    <div class="code-block">
+<span class="annotation">@Transactional</span>(rollbackFor = Exception.<span class="keyword">class</span>)
+<span class="keyword">public void</span> fixedCase() <span class="keyword">throws</span> Exception {
+    orderRepository.save(order);
+    <span class="keyword">throw new</span> Exception(<span class="string">"체크 예외"</span>);
+    <span class="comment">// 이제 롤백됨! ✅</span>
+}
+                    </div>
+                </div>
+
+                <h3>시나리오 4: 부분 롤백 (REQUIRES_NEW)</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Transactional</span>
+<span class="keyword">public void</span> partialRollback() {
+    orderRepository.save(order);               <span class="comment">// 트랜잭션 A</span>
+    
+    logService.log(<span class="string">"주문 시도"</span>);               <span class="comment">// 트랜잭션 B (REQUIRES_NEW)</span>
+    
+    <span class="keyword">throw new</span> RuntimeException(<span class="string">"주문 실패"</span>);   <span class="comment">// 예외!</span>
+}
+
+<span class="annotation">@Transactional</span>(propagation = Propagation.REQUIRES_NEW)
+<span class="keyword">public void</span> log(String msg) {
+    logRepository.save(log);                   <span class="comment">// 트랜잭션 B</span>
+}
+                    </div>
+
+                    <div class="highlight-box info">
+                        <strong>🔹 결과:</strong><br>
+                        • 트랜잭션 A (주문): 롤백 ❌<br>
+                        • 트랜잭션 B (로그): 커밋 ✅<br>
+                        <br>
+                        <strong>활용:</strong> 실패해도 로그는 남겨야 할 때
+                    </div>
+                </div>
+
+                <h3>시나리오 5: 내부 호출 문제 (프록시 우회) 🚨</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> OrderService {
+    
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> createOrder() {
+        <span class="comment">// 트랜잭션 적용됨 ✅</span>
+        
+        updateStock(); <span class="comment">// 같은 클래스 내부 호출</span>
+    }
+    
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> updateStock() {
+        <span class="comment">// ❌ 트랜잭션 적용 안됨!</span>
+        <span class="comment">// 이유: 프록시를 거치지 않고 직접 호출</span>
+    }
+}
+                    </div>
+
+                    <div class="highlight-box error">
+                        <strong>❌ 문제:</strong> 내부 메서드 호출은 프록시를 거치지 않음!<br>
+                        <br>
+                        <strong>이유:</strong>
+                        <div class="code-block">
+<span class="comment">// 실제 동작:</span>
+<span class="keyword">this</span>.updateStock(); <span class="comment">// 프록시가 아닌 원본 객체의 this</span>
+                        </div>
+                    </div>
+
+                    <div class="highlight-box success">
+                        <strong>✅ 해결책 1: 다른 빈으로 분리</strong>
+                        <div class="code-block">
+<span class="annotation">@Service</span>
+<span class="keyword">public class</span> OrderService {
+    <span class="annotation">@Autowired</span>
+    <span class="keyword">private</span> StockService stockService;
+    
+    <span class="annotation">@Transactional</span>
+    <span class="keyword">public void</span> createOrder() {
+        stockService.updateStock(); <span class="comment">// 다른 빈 → 프록시 거침 ✅</span>
+    }
+}
+                        </div>
+                    </div>
+                </div>
+
+                <h3>롤백 규칙 정리</h3>
+                <table class="comparison-table">
+                    <tr>
+                        <th>예외 타입</th>
+                        <th>기본 동작</th>
+                        <th>설정</th>
+                    </tr>
+                    <tr>
+                        <td><strong>RuntimeException</strong><br>(Unchecked)</td>
+                        <td>롤백 ❌</td>
+                        <td>@Transactional<br>(기본값)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Exception</strong><br>(Checked)</td>
+                        <td>커밋 ✅</td>
+                        <td>@Transactional<br>(기본값)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Exception</strong><br>(Checked)</td>
+                        <td>롤백 ❌</td>
+                        <td>@Transactional<br>(rollbackFor = Exception.class)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RuntimeException</strong></td>
+                        <td>커밋 ✅</td>
+                        <td>@Transactional<br>(noRollbackFor = RuntimeException.class)</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Tab 7: ThreadLocal -->
+            <div id="threadlocal" class="tab-content">
+                <h2>🧵 ThreadLocal과 트랜잭션 동기화</h2>
+
+                <div class="highlight-box info">
+                    <strong>핵심 질문:</strong> 같은 트랜잭션 내에서 여러 Repository가 어떻게 같은 Connection을 사용할까?<br>
+                    <strong>답:</strong> ThreadLocal!
+                </div>
+
+                <h3>ThreadLocal이란?</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="keyword">public class</span> ThreadLocalExample {
+    
+    <span class="comment">// 스레드마다 독립적인 변수</span>
+    <span class="keyword">private static</span> ThreadLocal&lt;String&gt; threadLocal = 
+        <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="keyword">public static void</span> main(String[] args) {
+        <span class="comment">// 스레드 1</span>
+        <span class="keyword">new</span> Thread(() -&gt; {
+            threadLocal.set(<span class="string">"Thread-1의 값"</span>);
+            System.out.println(threadLocal.get()); <span class="comment">// "Thread-1의 값"</span>
+        }).start();
+        
+        <span class="comment">// 스레드 2</span>
+        <span class="keyword">new</span> Thread(() -&gt; {
+            threadLocal.set(<span class="string">"Thread-2의 값"</span>);
+            System.out.println(threadLocal.get()); <span class="comment">// "Thread-2의 값"</span>
+        }).start();
+        
+        <span class="comment">// 각 스레드가 독립적인 값을 가짐!</span>
+    }
+}
+                    </div>
+                </div>
+
+                <h3>트랜잭션에서 ThreadLocal 사용</h3>
+                <div class="diagram">
+                    <div class="flow-step">
+                        <h4><span class="badge action">1</span> 트랜잭션 시작 - Connection 저장</h4>
+                        <div class="code-block">
+<span class="comment">// TransactionManager</span>
+Connection conn = dataSource.getConnection();
+conn.setAutoCommit(<span class="keyword">false</span>);
+
+<span class="comment">// ThreadLocal에 Connection 저장</span>
+TransactionSynchronizationManager.bindResource(
+    dataSource, 
+    <span class="keyword">new</span> ConnectionHolder(conn)
+);
+                        </div>
+                    </div>
+
+                    <div class="flow-arrow">↓</div>
+
+                    <div class="flow-step">
+                        <h4><span class="badge action">2</span> Repository - Connection 가져오기</h4>
+                        <div class="code-block">
+<span class="comment">// OrderRepository</span>
+<span class="keyword">public void</span> save(Order order) {
+    <span class="comment">// ThreadLocal에서 Connection 꺼내기</span>
+    Connection conn = DataSourceUtils.getConnection(dataSource);
+    
+    <span class="comment">// SQL 실행</span>
+    PreparedStatement stmt = conn.prepareStatement(
+        <span class="string">"INSERT INTO orders VALUES (?, ?)"</span>
+    );
+    stmt.executeUpdate();
+}
+                        </div>
+                    </div>
+
+                    <div class="flow-arrow">↓</div>
+
+                    <div class="flow-step">
+                        <h4><span class="badge action">3</span> 다른 Repository도 같은 Connection</h4>
+                        <div class="code-block">
+<span class="comment">// PaymentRepository</span>
+<span class="keyword">public void</span> save(Payment payment) {
+    <span class="comment">// 같은 ThreadLocal에서 같은 Connection!</span>
+    Connection conn = DataSourceUtils.getConnection(dataSource);
+    
+    <span class="comment">// 같은 트랜잭션 내에서 실행됨</span>
+    PreparedStatement stmt = conn.prepareStatement(
+        <span class="string">"INSERT INTO payments VALUES (?, ?)"</span>
+    );
+    stmt.executeUpdate();
+}
+                        </div>
+                    </div>
+
+                    <div class="flow-arrow">↓</div>
+
+                    <div class="flow-step">
+                        <h4><span class="badge action">4</span> 트랜잭션 종료 - Connection 정리</h4>
+                        <div class="code-block">
+<span class="comment">// TransactionManager</span>
+conn.commit(); <span class="comment">// 또는 rollback()</span>
+
+<span class="comment">// ThreadLocal에서 제거</span>
+TransactionSynchronizationManager.unbindResource(dataSource);
+
+<span class="comment">// Connection 반환</span>
+conn.close();
+                        </div>
+                    </div>
+                </div>
+
+                <h3>멀티스레드 환경에서의 안전성</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="comment">// 동시에 2개 HTTP 요청</span>
+
+Thread-1 (사용자 A):
+    ├─ TransactionManager.getTransaction()
+    ├─ Connection-1 획득
+    ├─ ThreadLocal에 Connection-1 저장
+    ├─ orderRepository.save()
+    │   └─ ThreadLocal에서 Connection-1 꺼냄 ✅
+    └─ commit(Connection-1)
+
+Thread-2 (사용자 B):
+    ├─ TransactionManager.getTransaction()
+    ├─ Connection-2 획득
+    ├─ ThreadLocal에 Connection-2 저장
+    ├─ orderRepository.save()
+    │   └─ ThreadLocal에서 Connection-2 꺼냄 ✅
+    └─ commit(Connection-2)
+
+<span class="comment">→ 각 스레드가 독립적인 Connection 사용! 안전! 🔒</span>
+                    </div>
+                </div>
+
+                <h3>TransactionSynchronizationManager 내부 구조</h3>
+                <div class="diagram">
+                    <div class="code-block">
+<span class="keyword">public abstract class</span> TransactionSynchronizationManager {
+    
+    <span class="comment">// ThreadLocal 변수들</span>
+    <span class="keyword">private static final</span> ThreadLocal&lt;Map&lt;Object, Object&gt;&gt; 
+        resources = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="keyword">private static final</span> ThreadLocal&lt;String&gt; 
+        currentTransactionName = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="keyword">private static final</span> ThreadLocal&lt;Boolean&gt; 
+        currentTransactionReadOnly = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="keyword">private static final</span> ThreadLocal&lt;Integer&gt; 
+        currentTransactionIsolationLevel = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="keyword">private static final</span> ThreadLocal&lt;Boolean&gt; 
+        actualTransactionActive = <span class="keyword">new</span> ThreadLocal&lt;&gt;();
+    
+    <span class="comment">// Connection 저장</span>
+    <span class="keyword">public static void</span> bindResource(Object key, Object value) {
+        Map&lt;Object, Object&gt; map = resources.get();
+        <span class="keyword">if</span> (map == <span class="keyword">null</span>) {
+            map = <span class="keyword">new</span> HashMap&lt;&gt;();
+            resources.set(map);
+        }
+        map.put(key, value); <span class="comment">// DataSource → ConnectionHolder</span>
+    }
+    
+    <span class="comment">// Connection 가져오기</span>
+    <span class="keyword">public static</span> Object getResource(Object key) {
+        Map&lt;Object, Object&gt; map = resources.get();
+        <span class="keyword">return</span> map != <span class="keyword">null</span> ? map.get(key) : <span class="keyword">null</span>;
+    }
+    
+    <span class="comment">// Connection 제거</span>
+    <span class="keyword">public static</span> Object unbindResource(Object key) {
+        Map&lt;Object, Object&gt; map = resources.get();
+        <span class="keyword">if</span> (map == <span class="keyword">null</span>) {
+            <span class="keyword">return null</span>;
+        }
+        Object value = map.remove(key);
+        <span class="keyword">if</span> (map.isEmpty()) {
+            resources.remove(); <span class="comment">// 빈 맵 제거</span>
+        }
+        <span class="keyword">return</span> value;
+    }
+}
+                    </div>
+                </div>
+
+                <h3>왜 ThreadLocal을 사용할까?</h3>
+                <div class="interactive-diagram">
+                    <div class="diagram-box">
+                        <div class="icon">🔒</div>
+                        <h4>스레드 안전</h4>
+                        <p>각 스레드가 독립적인 Connection</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🎯</div>
+                        <h4>파라미터 불필요</h4>
+                        <p>Connection을 전달하지 않아도 됨</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🔄</div>
+                        <h4>트랜잭션 일관성</h4>
+                        <p>같은 트랜잭션 내 모든 코드가 같은 Connection</p>
+                    </div>
+                    <div class="diagram-box">
+                        <div class="icon">🧹</div>
+                        <h4>자동 정리</h4>
+                        <p>트랜잭션 종료 시 자동 제거</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>💡 핵심 정리:</strong><br>
+                    • ThreadLocal 덕분에 Repository는 Connection을 직접 받지 않아도 됨<br>
+                    • 같은 스레드 내 모든 Repository가 자동으로 같은 Connection 사용<br>
+                    • 각 HTTP 요청(스레드)마다 독립적인 Connection → 스레드 안전<br>
+                    • 트랜잭션 종료 시 자동으로 ThreadLocal 정리
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🎓 스프링 트랜잭션 AOP 완벽 가이드</p>
+            <p>@Transactional 하나로 이 모든 것이 자동으로!</p>
+        </footer>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // 모든 탭 비활성화
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // 모든 탭 콘텐츠 숨기기
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // 선택된 탭 활성화
+            event.target.classList.add('active');
+
+            // 선택된 콘텐츠 표시
+            document.getElementById(tabName).classList.add('active');
+
+            // 스크롤 최상단으로
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleDetails(id) {
+            const element = document.getElementById(id);
+            element.classList.toggle('active');
+        }
+
+        // 페이지 로드 시 애니메이션
+        document.addEventListener('DOMContentLoaded', () => {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            });
+
+            document.querySelectorAll('.flow-step, .component-box, .timeline-item').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                el.style.transition = 'all 0.5s ease';
+                observer.observe(el);
+            });
+        });
+    </script>
+</body>
+</html>
